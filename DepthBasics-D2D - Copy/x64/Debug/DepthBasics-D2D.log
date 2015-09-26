@@ -1,0 +1,15 @@
+﻿Build started 9/25/2015 7:36:25 PM.
+     1>Project "C:\Users\mike\Documents\DepthBasics-D2D - Copy\DepthBasics-D2D.vcxproj" on node 2 (Build target(s)).
+     1>ClCompile:
+         C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\x86_amd64\CL.exe /c /ZI /nologo /W1 /WX- /Od /D WIN32 /D _DEBUG /D _WINDOWS /D _UNICODE /D UNICODE /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"x64\Debug\\" /Fd"x64\Debug\vc140.pdb" /Gd /TP /errorReport:prompt DepthBasics.cpp ImageRenderer.cpp
+         ImageRenderer.cpp
+         DepthBasics.cpp
+     1>c:\users\mike\documents\depthbasics-d2d - copy\depthbasics.cpp(63): error C2065: 'cColorWidth': undeclared identifier
+     1>c:\users\mike\documents\depthbasics-d2d - copy\depthbasics.cpp(63): error C2065: 'cColorHeight': undeclared identifier
+     1>c:\users\mike\documents\depthbasics-d2d - copy\depthbasics.cpp(63): error C3078: array size must be specified in new expressions
+         Generating Code...
+     1>Done Building Project "C:\Users\mike\Documents\DepthBasics-D2D - Copy\DepthBasics-D2D.vcxproj" (Build target(s)) -- FAILED.
+
+Build FAILED.
+
+Time Elapsed 00:00:03.72
