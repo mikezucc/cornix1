@@ -82,11 +82,26 @@ CDepthBasics::~CDepthBasics()
         m_pDepthRGBX = NULL;
     }
 
+	if (m_pDrawColor)
+	{
+		delete m_pDrawColor;
+		m_pDrawColor = NULL;
+	}
+
+	if (m_pColorRGBX)
+	{
+		delete[] m_pColorRGBX;
+		m_pColorRGBX = NULL;
+	}
+
     // clean up Direct2D
     SafeRelease(m_pD2DFactory);
 
     // done with depth frame reader
     SafeRelease(m_pDepthFrameReader);
+
+	// done with color frame reader
+	SafeRelease(m_pColorFrameReader);
 
     // close the Kinect Sensor
     if (m_pKinectSensor)
@@ -163,7 +178,14 @@ void CDepthBasics::Update()
         return;
     }
 
+	if (!m_pColorFrameReader)
+	{
+		return;
+	}
+
     IDepthFrame* pDepthFrame = NULL;
+
+	IColorFrame* pColorFrame = NULL;
 
     HRESULT hr = m_pDepthFrameReader->AcquireLatestFrame(&pDepthFrame);
 

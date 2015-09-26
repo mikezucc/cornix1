@@ -14,6 +14,13 @@ $RECYCLE.BIN/
 *.msm
 *.msp
 
+*.sdf
+*.ilk
+*.log
+*.tlog
+*.lastbuildstate
+*.idb
+
 # Windows shortcuts
 *.lnk
 
