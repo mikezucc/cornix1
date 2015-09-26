@@ -180,6 +180,7 @@ void CDepthBasics::Update()
 
 	if (!m_pColorFrameReader)
 	{
+		m_pColorFrameReader(NULL); //IColorFrameReader(NULL);
 		return;
 	}
 
@@ -188,6 +189,7 @@ void CDepthBasics::Update()
 	IColorFrame* pColorFrame = NULL;
 
     HRESULT hr = m_pDepthFrameReader->AcquireLatestFrame(&pDepthFrame);
+	HRESULT hrColor = m_pColorFrameReader->AcquireLatestFrame(&pColorFrame);
 
     if (SUCCEEDED(hr))
     {
@@ -200,7 +202,15 @@ void CDepthBasics::Update()
         UINT nBufferSize = 0;
         UINT16 *pBuffer = NULL;
 
+		IFrameDescription* pFrameDescriptionColor = NULL;
+		UINT nBufferSizeColor = 0;
+		RGBQUAD *pBufferColor = NULL;
+		ColorImageFormat imageFormat = ColorImageFormat_None;
+		int nWidthColor = 0;
+		int nHeightColor = 0;
+
         hr = pDepthFrame->get_RelativeTime(&nTime);
+		hrColor = pColorFrame->get_RelativeTime(&nTime);
 
         if (SUCCEEDED(hr))
         {
@@ -222,6 +232,28 @@ void CDepthBasics::Update()
             hr = pDepthFrame->get_DepthMinReliableDistance(&nDepthMinReliableDistance);
         }
 
+		//color
+		if (SUCCEEDED(hrColor))
+		{
+			hrColor = pColorFrame->get_FrameDescription(&pFrameDescriptionColor);
+		}
+
+		if (SUCCEEDED(hrColor))
+		{
+			hrColor = pFrameDescriptionColor->get_Width(&nWidthColor);
+		}
+
+		if (SUCCEEDED(hrColor))
+		{
+			hrColor = pFrameDescriptionColor->get_Height(&nHeightColor);
+		}
+
+		if (SUCCEEDED(hrColor))
+		{
+			hrColor = pColorFrame->get_RawColorImageFormat(&imageFormat);
+		}
+		//
+
         if (SUCCEEDED(hr))
         {
 			// In order to see the full range of depth (including the less reliable far field depth)
@@ -231,21 +263,51 @@ void CDepthBasics::Update()
 			// Note:  If you wish to filter by reliable depth distance, uncomment the following line.
             //// hr = pDepthFrame->get_DepthMaxReliableDistance(&nDepthMaxDistance);
         }
+		
+		//color
+		if (SUCCEEDED(hrColor))
+		{
+			if (imageFormat == ColorImageFormat_Bgra)
+			{
+				hrColor = pColorFrame->AccessRawUnderlyingBuffer(&nBufferSizeColor, reinterpret_cast<BYTE**>(&pBufferColor));
+			}
+			else if (m_pColorRGBX)
+			{
+				pBufferColor = m_pColorRGBX;
+				nBufferSizeColor = cColorWidth * cColorHeight * sizeof(RGBQUAD);
+				hrColor = pColorFrame->CopyConvertedFrameDataToArray(nBufferSizeColor, reinterpret_cast<BYTE*>(pBufferColor), ColorImageFormat_Bgra);
+			}
+			else
+			{
+				hrColor = E_FAIL;
+			}
+		}
+		//
 
         if (SUCCEEDED(hr))
         {
             hr = pDepthFrame->AccessUnderlyingBuffer(&nBufferSize, &pBuffer);            
         }
 
+		//color
+
+		if (SUCCEEDED(hrColor))
+		{
+			ProcessColor(nTime, pBufferColor, nWidthColor, nHeightColor);
+		}
+		//
+
         if (SUCCEEDED(hr))
         {
-            ProcessDepth(nTime, pBuffer, nWidth, nHeight, nDepthMinReliableDistance, nDepthMaxDistance);
+            ProcessDepth(nTime, pBuffer, pBufferColor, nWidth, nHeight, nDepthMinReliableDistance, nDepthMaxDistance);
         }
 
         SafeRelease(pFrameDescription);
+		SafeRelease(pFrameDescriptionColor);
     }
 
     SafeRelease(pDepthFrame);
+	SafeRelease(pColorFrame);
 }
 
 /// <summary>
@@ -390,7 +452,7 @@ HRESULT CDepthBasics::InitializeDefaultSensor()
 /// <param name="nMinDepth">minimum reliable depth</param>
 /// <param name="nMaxDepth">maximum reliable depth</param>
 /// </summary>
-void CDepthBasics::ProcessDepth(INT64 nTime, const UINT16* pBuffer, int nWidth, int nHeight, USHORT nMinDepth, USHORT nMaxDepth)
+void CDepthBasics::ProcessDepth(INT64 nTime, const UINT16* pBuffer, const  RGBQUAD* pBufferColor, int nWidth, int nHeight, USHORT nMinDepth, USHORT nMaxDepth)
 {
     if (m_hWnd)
     {
@@ -486,6 +548,82 @@ void CDepthBasics::ProcessDepth(INT64 nTime, const UINT16* pBuffer, int nWidth, 
             m_bSaveScreenshot = false;
         }
     }
+}
+
+/// <summary>
+/// Handle new color data
+/// <param name="nTime">timestamp of frame</param>
+/// <param name="pBuffer">pointer to frame data</param>
+/// <param name="nWidth">width (in pixels) of input image data</param>
+/// <param name="nHeight">height (in pixels) of input image data</param>
+/// </summary>
+void CDepthBasics::ProcessColor(INT64 nTime, RGBQUAD* pBuffer, int nWidth, int nHeight)
+{
+	if (m_hWnd)
+	{
+		if (!m_nStartTime)
+		{
+			m_nStartTime = nTime;
+		}
+
+		double fps = 0.0;
+
+		LARGE_INTEGER qpcNow = { 0 };
+		if (m_fFreq)
+		{
+			if (QueryPerformanceCounter(&qpcNow))
+			{
+				if (m_nLastCounter)
+				{
+					m_nFramesSinceUpdate++;
+					fps = m_fFreq * m_nFramesSinceUpdate / double(qpcNow.QuadPart - m_nLastCounter);
+				}
+			}
+		}
+
+		WCHAR szStatusMessage[64];
+		StringCchPrintf(szStatusMessage, _countof(szStatusMessage), L" FPS = %0.2f    Time = %I64d", fps, (nTime - m_nStartTime));
+
+		if (SetStatusMessage(szStatusMessage, 1000, false))
+		{
+			m_nLastCounter = qpcNow.QuadPart;
+			m_nFramesSinceUpdate = 0;
+		}
+	}
+
+	// Make sure we've received valid data
+	if (pBuffer && (nWidth == cColorWidth) && (nHeight == cColorHeight))
+	{
+		// Draw the data with Direct2D
+		//m_pDrawColor->Draw(reinterpret_cast<BYTE*>(pBuffer), cColorWidth * cColorHeight * sizeof(RGBQUAD));
+
+		/*if (m_bSaveScreenshot)
+		{
+			WCHAR szScreenshotPath[MAX_PATH];
+
+			// Retrieve the path to My Photos
+			GetScreenshotFileName(szScreenshotPath, _countof(szScreenshotPath));
+
+			// Write out the bitmap to disk
+			HRESULT hr = SaveBitmapToFile(reinterpret_cast<BYTE*>(pBuffer), nWidth, nHeight, sizeof(RGBQUAD) * 8, szScreenshotPath);
+
+			WCHAR szStatusMessage[64 + MAX_PATH];
+			if (SUCCEEDED(hr))
+			{
+				// Set the status bar to show where the screenshot was saved
+				StringCchPrintf(szStatusMessage, _countof(szStatusMessage), L"Screenshot saved to %s", szScreenshotPath);
+			}
+			else
+			{
+				StringCchPrintf(szStatusMessage, _countof(szStatusMessage), L"Failed to write screenshot to %s", szScreenshotPath);
+			}
+
+			SetStatusMessage(szStatusMessage, 5000, true);B
+
+			// toggle off so we don't save a screenshot again next frame
+			m_bSaveScreenshot = false;
+		}*/
+	}
 }
 
 /// <summary>

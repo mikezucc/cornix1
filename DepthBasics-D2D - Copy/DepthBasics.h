@@ -97,7 +97,16 @@ private:
     /// <param name="nMinDepth">minimum reliable depth</param>
     /// <param name="nMaxDepth">maximum reliable depth</param>
     /// </summary>
-    void                    ProcessDepth(INT64 nTime, const UINT16* pBuffer, int nHeight, int nWidth, USHORT nMinDepth, USHORT nMaxDepth);
+    void                    ProcessDepth(INT64 nTime, const UINT16* pBuffer, const RGBQUAD* pBufferColor, int nHeight, int nWidth, USHORT nMinDepth, USHORT nMaxDepth);
+
+	/// <summary>
+	/// Handle new color data
+	/// <param name="nTime">timestamp of frame</param>
+	/// <param name="pBuffer">pointer to frame data</param>
+	/// <param name="nWidth">width (in pixels) of input image data</param>
+	/// <param name="nHeight">height (in pixels) of input image data</param>
+	/// </summary>
+	void                    ProcessColor(INT64 nTime, RGBQUAD* pBuffer, int nWidth, int nHeight);
 
     /// <summary>
     /// Set the status bar message
